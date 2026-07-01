@@ -28,12 +28,17 @@ public class AGtsp {
         criarPopulacao();
 
         for (int i = 0; i < this.numeroGeracoes; i++) {
-            //
+            novaPopulacao();
+
+            // Exibir a evolução da população a cada geração
+            int melhorDaGeracao = obterMelhor();
+            double distMelhor = 1.0 / fitness(this.populacao.get(melhorDaGeracao));
+            System.out.printf("Geração %d - Melhor distância: %.2f\n", (i + 1), distMelhor);
         }
 
-        int melhor = obterMelhor(); 
+        int melhor = obterMelhor();
         System.out.println("\nMelhor solução encontrada:");
-        mostrarRota(populacao.get(melhor));
+        mostrarRota(populacao.get(melhor)); // Exibe a melhor rota encontrada e a distância total [cite: 42, 44]
     }
 
     public void carregarCidades(String arquivo) {
@@ -60,12 +65,16 @@ public class AGtsp {
     }
 
     private void criarPopulacao() {
-        //
+        for (int i = 0; i < this.tamPopulacao; i++) {
+            this.populacao.add(criarCromossomo());
+        }
     }
 
     private void mostraPopulacao() {
         for (int i = 0; i < this.populacao.size(); i++) {
-            // mostrar indivíduo, fitness e distância total
+            double fit = fitness(this.populacao.get(i));
+            double distancia = 1.0 / fit;
+            System.out.printf("Indivíduo %d | Distância: %.2f | Fitness: %.6f\n", i, distancia, fit);
         }
         System.out.println("-------------------------------");
     }
@@ -79,28 +88,38 @@ public class AGtsp {
     private double fitness(ArrayList<Cidade> cromossomo) {
         double distanciaTotal = 0;
 
-        // Somar as distâncias entre cidades consecutivas na rota e adicionar na distancia total
-      
-        // calcular a distancia da ultima cidade para a primeira e adicionar na distancia total
- 
+        // Somar as distâncias entre cidades consecutivas na rota [cite: 19]
+        for (int i = 0; i < cromossomo.size() - 1; i++) {
+            distanciaTotal += calcularDistancia(cromossomo.get(i), cromossomo.get(i + 1));
+        }
 
-        // Quanto menor a distância, melhor, assim retornar o inverso.
+        // Calcular a distancia da ultima cidade para a primeira para fechar o ciclo
+        distanciaTotal += calcularDistancia(cromossomo.get(cromossomo.size() - 1), cromossomo.get(0));
+
+        // Quanto menor a distância, melhor, assim retornar o inverso[cite: 20].
         return (1.0 / distanciaTotal);
     }
 
     //------------------------------
     private void gerarRoleta() {
         this.roletaVirtual.clear();
-
-        //
+        for (int i = 0; i < this.populacao.size(); i++) {
+            double fit = fitness(this.populacao.get(i));
+            // Multiplicamos o fitness (que é pequeno) para criar fatias inteiras proporcionais
+            int fatias = (int) (fit * 100000);
+            for (int j = 0; j < fatias; j++) {
+                this.roletaVirtual.add(i);
+            }
+        }
     }
-
 
     private int roleta() {
-        
-        return 0;
+        Random rand = new Random();
+        int posicao = rand.nextInt(this.roletaVirtual.size());
+        return this.roletaVirtual.get(posicao);
     }
-//------------------------------
+
+    //------------------------------
 
     public ArrayList<ArrayList<Cidade>> cruzamentoPMX(ArrayList<Cidade> pai1, ArrayList<Cidade> pai2) {
         int tamanho = pai1.size();
@@ -150,31 +169,90 @@ public class AGtsp {
     }
 
     private void mutacao(ArrayList<Cidade> cromossomo) {
-        //
+        Random rand = new Random();
+        // Verifica se a mutação vai ocorrer baseada na probabilidade
+        if (rand.nextInt(100) < this.probMutacao) {
+            int pos1 = rand.nextInt(cromossomo.size());
+            int pos2 = rand.nextInt(cromossomo.size());
+
+            // Troca duas cidades de posição (swap) [cite: 38]
+            Collections.swap(cromossomo, pos1, pos2);
+        }
     }
 
     private int obterMelhor() {
-        int melhor = 0;
-        //
-        return melhor;
+        int melhorIndex = 0;
+        double melhorFitness = fitness(this.populacao.get(0));
+
+        for (int i = 1; i < this.populacao.size(); i++) {
+            double fitAtual = fitness(this.populacao.get(i));
+            if (fitAtual > melhorFitness) {
+                melhorFitness = fitAtual;
+                melhorIndex = i;
+            }
+        }
+        return melhorIndex;
     }
 
     private int obterPior() {
-        int pior = 0;
-        //
-        return pior;
+        int piorIndex = 0;
+        double piorFitness = fitness(this.populacao.get(0));
+
+        for (int i = 1; i < this.populacao.size(); i++) {
+            double fitAtual = fitness(this.populacao.get(i));
+            // O pior indivíduo é o que tem a maior distância, ou seja, o menor fitness
+            if (fitAtual < piorFitness) {
+                piorFitness = fitAtual;
+                piorIndex = i;
+            }
+        }
+        return piorIndex;
     }
 
     private void novaPopulacao() {
-        //
+        gerarRoleta();
+        ArrayList<ArrayList<Cidade>> novaPop = new ArrayList<>();
+
+        // Elitismo: garante que a melhor rota não seja perdida de uma geração para a outra
+        novaPop.add(this.populacao.get(obterMelhor()));
+
+        while (novaPop.size() < this.tamPopulacao) {
+            int pai1 = roleta();
+            int pai2 = roleta();
+
+            // Cruzamento PMX
+            ArrayList<ArrayList<Cidade>> filhos = cruzamentoPMX(this.populacao.get(pai1), this.populacao.get(pai2));
+
+            // Mutação
+            mutacao(filhos.get(0));
+            mutacao(filhos.get(1));
+
+            novaPop.add(filhos.get(0));
+            if (novaPop.size() < this.tamPopulacao) {
+                novaPop.add(filhos.get(1));
+            }
+        }
+        this.populacao = novaPop;
     }
 
     private void operadoresGeneticos() {
-        //
+        novaPopulacao();
     }
 
     private void mostrarRota(ArrayList<Cidade> rota) {
-        //
+        System.out.println("Rota:");
+        for (int i = 0; i < rota.size(); i++) {
+            System.out.print(rota.get(i).getNome());
+            if (i < rota.size() - 1) {
+                System.out.print(" -> ");
+            }
+        }
+        // Retorna para a cidade de origem
+        System.out.println(" -> " + rota.get(0).getNome());
+
+        // A distância total é o inverso do fitness
+        double distanciaTotal = 1.0 / fitness(rota);
+        System.out.printf("Distância total: %.2f\n", distanciaTotal);
     }
 
     public static void main(String[] args) {
